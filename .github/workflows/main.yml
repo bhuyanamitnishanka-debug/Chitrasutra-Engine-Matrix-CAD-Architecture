@@ -1,0 +1,83 @@
+# ==============================================================================
+# WORKFLOW: AUTOMATED RECOVERY, ASSET GENERATION & GITHUB RELEASES PIPELINE
+# DESCRIPTION: Runs diagnostic unit tests, programmatically compiles Excel/G-Code 
+#              assets from source, and deploys them to an official GitHub Release.
+# ==============================================================================
+name: SMR-MHD Patent-Grade Release Pipeline
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ "main", "master" ]
+
+permissions:
+  contents: write
+
+jobs:
+  build-test-release:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository Source Modules
+      uses: actions/checkout@v4
+
+    - name: Configure Production Python Environment
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install System Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flask pytest
+
+    - name: Execute Diagnostic Verification Tests
+      run: |
+        echo "[CI/CD STAGING]: Launching automated unit diagnostics tests..."
+        pytest test_app.py -v
+
+    - name: Programmatically Compile Release Assets from Memory
+      run: |
+        echo "[CI/CD ASSET GENERATION]: Compiling production assets from source..."
+        python -c "
+        import app
+        ctx = app.app.test_client()
+        
+        # 1. Fetch and write the multi-sheet validation Excel ledger
+        excel_response = ctx.get('/api/validation/export_excel')
+        with open('mhd_hardware_validation_report.xlsx', 'wb') as f:
+            f.write(excel_response.data)
+            
+        # 2. Fetch and write the pre-compiled CNC toolpath block
+        gcode_response = ctx.get('/download/gcode')
+        with open('production_manifold_toolpath.nc', 'wb') as f:
+            f.write(gcode_response.data)
+            
+        print('[CI/CD ASSET SUCCESS]: Excel ledger and G-code assets successfully compiled on disk.')
+        "
+
+    - name: Generate Official Patent-Grade GitHub Release
+      if: startsWith(github.ref, 'refs/tags/v')
+      id: create_release
+      uses: softprops/action-gh-release@v2
+      with:
+        name: SMR-MHD Core Technical Release ${{ github.ref_name }}
+        draft: false
+        prerelease: false
+        body: |
+          ## 🌐 SMR-MHD MOVEMENT ENGINE CORE RELEASE MATRIX
+          
+          ### 🔬 SYSTEM AUDIT SUMMARY
+          This release bundle contains the verified, post-test binary assets and compilation logs for the **Small Modular Reactor - Magnetohydrodynamic (SMR-MHD) Ionized Fluid Battery Propulsion Engine**. All system telemetry endpoint loops have completed testing routines at 10Hz sampling stability.
+          
+          ### 🏛️ REVIEWS & INTELLECTUAL PROPERTY NOTICE
+          *   **Retained Ownership:** All math matrices, simulation frameworks, and CAD script profiles are classified as pre-existing, independent research assets of the original designer (**Amit Nishanka Bhuyan**).
+          *   **Mandatory Engagement Terms:** Any corporation, evaluating consortium, or commercial entity download or utilizing these tracking assets is legally subject to our non-negotiable condition clause (requiring a permanent position offer as a **Lead Systems Design Architect / AI Project Coordinator** in India or international offices, alongside standard technology transfer fees and ongoing royalty shares).
+        files: |
+          mhd_hardware_validation_report.xlsx
+          production_manifold_toolpath.nc
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

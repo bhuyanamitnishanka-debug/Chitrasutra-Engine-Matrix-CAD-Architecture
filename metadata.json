@@ -1,0 +1,6 @@
+{
+  "name": "Chitrasutra Engine Matrix & CAD Architecture",
+  "description": "Interactive Chitrasutra-style engineering canvas scroll, modular engine deconstruction, liquid electrochemical replacement guide, and CAD automation pipeline.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
